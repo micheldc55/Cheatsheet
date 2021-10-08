@@ -160,6 +160,8 @@ import dbconnection
 
 #### Importing coordinates from SQL into GeoPandas
 
+A very good reference article on the topic can be found [here](https://medium.com/analytics-vidhya/geospatial-data-a-beginners-guide-to-working-with-ms-sql-server-express-in-python-e5f83350f069)
+
 ```
 # Establish database connection
 cur, conn = dbconnection.connect('database initialization file or ', 'section within the database.ini file')
