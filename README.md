@@ -144,3 +144,87 @@ Pandas .concat() function allows you to join two DataFrames df1 and df2 by stick
 ```python
 pd.concat([df1, df2])  # Joins DataFrames df1 and df2 on the last row of df1 and the first row of df2
 ```
+
+
+
+# Working with GeoPandas
+
+### Imports
+
+```
+import geopandas as gpd
+
+# For connecting to a PostgreSQL Database (this is only an example)
+import dbconnection
+```
+
+#### Importing coordinates from SQL into GeoPandas
+
+```
+# Establish database connection
+cur, conn = dbconnection.connect('database initialization file or ', 'section within the database.ini file')
+
+sql_query = """
+SELECT * FROM ...
+"""
+
+df = gpd.GeoDataFrame.from_postgis(sql_query, conn, geom_col='coordinates/geom_df_column')
+
+conn.close()
+```
+
+**Example:** Using an iteration process to extract a GeoPandas DataFrame from a SQL query and concatenate it with others in a for loop. Notice that the gpd.GeoDataFrme.from_postgis() method doesn't allow the use of in iterable in the geom_col argument and the query returns a df with two geometry columns ('city_center_location' and 'admin_area_location'), so we are performing two queries and generating two df's. Finally we create a new column with the other geometry-type column and paste it in the df we want to use.
+
+
+```
+localities_country_geo_df = pd.DataFrame()
+countries_missing_geo_df  = []
+
+cur, conn = dbconnection.connect('../src/database.ini', 'lam-mea-nam-oce-sea-mnr')
+
+sql_query = """
+select 
+aa.feat_id as admin_area_id,
+aa.country_code_char3,
+aa.feat_type,
+ad1."name" as admin_level_1,
+aa."name" as admin_area_name,
+aa.feat_area,
+mc.feat_id as city_center_id,
+mc."name" as city_center_name,
+mc.admin_class,
+mc.display_class,
+ma.value_integer as population,
+mc.geom as city_center_location,
+aa.geom as admin_area_location
+
+from "_2021_09_007_{region}_{country}_{country}".mnr_citycenter as mc
+
+join "_2021_09_007_{region}_{country}_{country}".mnr_admin_area as aa on mc.feat_id = aa.citycenter_id
+
+join "_2021_09_007_{region}_{country}_{country}".mnr_admin_area2attribute as a2a on aa.feat_id = a2a.admin_area_id
+
+join "_2021_09_007_{region}_{country}_{country}".mnr_attribute as ma on a2a.attribute_id = ma.attribute_id
+
+left join (select * from "_2021_09_007_{region}_{country}_{country}".mnr_admin_area where feat_type=1112) ad1 on aa.a1_admin_id = ad1.a1_admin_id
+
+where aa.feat_type = 1119
+and ma.attribute_type = 'PO'
+--and mc.name <> aa.name
+"""
+
+for region, country in countries_to_query:
+    query_country = sql_query.format(country=country, region=region)
+    try:
+        df     = gpd.GeoDataFrame.from_postgis(query_country, conn, geom_col='city_center_location')
+        df_aux = gpd.GeoDataFrame.from_postgis(query_country, conn, geom_col='admin_area_location')
+        df['admin_area_location'] = df_aux['admin_area_location']
+        
+        localities_country_geo_df = pd.concat([localities_country_geo_df, df])
+
+        print(f'{country} done')
+    except:
+        countries_missing.append((region, country))
+        print(f'{country} not done')
+conn.close()
+```
